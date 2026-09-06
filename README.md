@@ -2,18 +2,28 @@
 
 A native Omarchy bar plugin for tools that need a human response. Calls are shown newest first. Selecting a call returns to its window or pane and acknowledges it only after successful routing. Calls disappear when their owner exits. CapsLock blinks while calls remain.
 
-**Private preview, 0.2.0.** This is an independent plugin by simondrey, not an official Omarchy component. No public publication or upstream submission has been made.
+**Private preview, 0.3.0.** This is an independent plugin by simondrey, not an official Omarchy component. No public publication or upstream submission has been made.
 
-## On this machine
+## CapsLock becomes a navigation key
 
-The plugin, user service, CapsLock mapping and LED backend are installed.
+**The default installation changes CapsLock system-wide.** Its previous action (including ordinary Caps Lock / capital-letter toggling) is replaced. Keep both hands in their normal typing position and use the home row to navigate text, menus and windows.
 
-- Click the bell in the top bar, tap CapsLock, or run `attention toggle`.
-- Use arrows and Enter, or click a call, to return to the requesting tool.
-- Hold CapsLock: **J = up, K = down, L = left, semicolon = right**.
-- A tap is shorter than 250 ms, with no other key used. Longer holds do not open the panel.
-- `caps-led on` and `caps-led off` still work without entering a password. Active attention calls temporarily control the LED.
-- `attention doctor` reports the queue and service state.
+| Keys | Result |
+|---|---|
+| Tap and release CapsLock | Open/close the active call list |
+| Hold CapsLock + J | Up arrow |
+| Hold CapsLock + K | Down arrow |
+| Hold CapsLock + L | Left arrow |
+| Hold CapsLock + ; | Right arrow |
+| Super + CapsLock + J/K/L/; | Focus the window above/below/left/right with Omarchy's default bindings |
+| Super + Shift + CapsLock + J/K/L/; | Swap the current window up/down/left/right with Omarchy's default bindings |
+| Shift + CapsLock + J/K/L/; | Shift + arrows, e.g. extend text selection |
+
+Super + CapsLock **also needs a direction key** to navigate windows. Modifier shortcuts follow your current Omarchy/application bindings; the plugin emits real arrow keys and does not override your window-manager shortcuts. `;` refers to the semicolon key in the standard US home-row position, not a shifted character on another layout.
+
+The remapping runs in keyd, below applications and the compositor. It therefore also works in the launchers/overlays opened with Super + Space and Super + K. A tap must be shorter than 250 ms with no other key used; a longer hold alone does not open the panel. The global keyd overload tap timeout is set to 250 ms, which also affects other overload mappings if you have them.
+
+Click the bell in the top bar or run `attention toggle` to open the list with the mouse or console. Select a call with arrows and Enter or a click. CapsLock's light blinks while any calls remain; it indicates pending attention rather than capital-letter mode. `caps-led on` and `caps-led off` work without a password after installation; active calls temporarily take control of the LED.
 
 ## Any shell command
 
@@ -100,7 +110,13 @@ Source contracts: [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Grok hoo
 
 ## Installation elsewhere
 
-Requires an Omarchy release using the Quickshell plugin system and Hyprland Lua dispatch, Python 3, systemd and keyd 2.6.0 for the optional LED backend. tmux and Herdr are optional.
+Requires an Omarchy release using the Quickshell plugin system and Hyprland Lua dispatch, Python 3, systemd, an installed keyd service, sudo/visudo, git, make and a C compiler. The default installer builds its pinned keyd 2.6.0 LED extension. tmux and Herdr are optional.
+
+On Arch/Omarchy, install missing build/runtime dependencies first:
+
+```bash
+sudo pacman -S --needed keyd base-devel git python sudo
+```
 
 ```bash
 git clone git@github.com:simondrey/agents-capslock.git
@@ -108,9 +124,15 @@ cd agents-capslock
 python3 install.py
 ```
 
+Run `python3 install.py` as your regular desktop user. It builds the keyboard backend, requests administrative authentication for the system step, configures CapsLock and passwordless LED control, then installs the bar, CLI and user service. Review the key behavior above before installing. No separate manual keyd editing or sudoers setup is needed.
+
+If you only want the bar and queue, use `python3 install.py --user-only`; this leaves system keyboard/LED configuration to you. This mode alone does not provide CapsLock navigation or LED blinking on a fresh machine.
+
+Existing keyd settings are backed up. The installer changes only the main CapsLock mapping, its own navigation layer and the global overload timeout; unrelated mappings and existing device selection are preserved. A fresh configuration matches all keyboards. Multiple device-specific `.conf` files require manual review before automatic setup, since they can take precedence over the default configuration.
+
 The installer migrates the old `simondrey.attention` bar entry in place and archives the old plugin outside the plugin directory. It copies the plugin to `~/.config/omarchy/plugins/simondrey.agents-capslock`, installs the CLI and user service, and adds F24 to the user's Hyprland bindings. Review existing F24 bindings first if installing on another machine. Updates can be applied by rerunning the installer; the daemon is restarted to load Python changes.
 
-The native `manifest.json` also supports `omarchy plugin add` once the repository becomes accessible. The user-service/CLI setup still needs `install.py`.
+The native `manifest.json` also supports `omarchy plugin add` once the repository becomes accessible. The complete system/user setup still needs `python3 install.py` from the downloaded plugin directory; `omarchy plugin add` alone only registers the shell widget.
 
 ### LED and CapsLock setup
 

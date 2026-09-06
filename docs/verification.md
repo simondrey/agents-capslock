@@ -22,3 +22,13 @@ Not live-tested: authenticated agent hook execution, Codex shared-daemon environ
 - New bar ID retained the old bar position; old installed plugin archived outside the plugin directory. Both CLI names resolve to the new installation; service remains active and the queue is empty after testing.
 
 Not claimed: a model-driven conversation after restarting Codex, or execution of untrusted native approval hooks. The current conversation cannot load newly registered MCP tools without restarting; the host stdio protocol test verifies the server independently.
+
+## Agents CapsLock 0.3.0 — keyboard included in installation
+
+- 31 unit tests pass. Added fresh/existing keyd configuration merging, preservation of unrelated mappings and device selection, rejection of ambiguous mappings, idempotence, and rollback of system files after a simulated keyd startup failure.
+- Built the pinned patched keyd from the upstream commit. Its native `check` accepted both a fresh generated preset and the migrated configuration from this machine.
+- Ran the default `python3 install.py` successfully, including the privileged system step, sudoers validation, system backup, keyd restart and user plugin installation.
+- Root virtual-keyboard test passed after installation: CapsLock tap emits F24, held J/K/L/semicolon emit Up/Down/Left/Right, long hold does not tap, and Super remains down around the generated arrows.
+- Real desktop test passed again: panel selection, requesting-window focus, LED blink, dead-owner cleanup and LED off when empty. User daemon and keyd were active; no test calls remained.
+
+A fresh machine's generated configuration was checked with keyd, not installed on a second physical computer. Stock Super-arrow focus and Super-Shift-arrow swap behavior was checked in this installed Omarchy's tiling bindings. The input test verifies actual modifier/arrow output; it does not assert every possible application or layout's response.

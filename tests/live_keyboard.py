@@ -39,8 +39,18 @@ try:
     assert not any(key in (36,37,38,39,58,194) for key,_ in events),events
     emit(58,1); time.sleep(.35); emit(58,0)
     assert not any(key==194 for key,_ in drain()), 'Long hold incorrectly tapped'
+    emit(125,1)  # Super must remain held while the layer emits real arrows.
+    emit(58,1)
+    for key in (36,37,38,39): emit(key,1); emit(key,0)
+    emit(58,0); emit(125,0)
+    events=drain()
+    assert (125,1) in events and (125,0) in events, events
+    for key in (103,108,105,106):
+        assert (key,1) in events and (key,0) in events, events
+        assert events.index((125,1)) < events.index((key,1)) < events.index((125,0)), events
+    assert not any(key in (36,37,38,39,58,194) for key,_ in events),events
     os.close(out)
-    print('PASS: CapsLock tap emits F24; held J/K/L/semicolon emit Up/Down/Left/Right; long hold has no tap')
+    print('PASS: CapsLock tap emits F24; held J/K/L/semicolon emit Up/Down/Left/Right; long hold has no tap; Super preserved for window navigation')
 finally:
     fcntl.ioctl(fd,0x5502)
     os.close(fd)

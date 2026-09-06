@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Install the user plugin and service. Does not install privileged LED support."""
+"""Install Agents CapsLock, including global CapsLock navigation and LED support."""
+import argparse
+import getpass
+import sys
 import os
 import json
 from pathlib import Path
@@ -7,6 +10,24 @@ import shutil
 import subprocess
 import time
 source = Path(__file__).resolve().parent
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--user-only', action='store_true', help='Install only the bar/queue; do not configure system keyboard or LED support')
+args = parser.parse_args()
+if os.geteuid() == 0:
+    parser.error('Run as your desktop user; only the system step requests elevation')
+if not args.user_only:
+    print('CapsLock will open the call list on tap; held J/K/L/; become Up/Down/Left/Right.', flush=True)
+    print('This replaces the previous CapsLock action. Other modifiers keep their normal arrow behavior.', flush=True)
+    print('The system step backs up keyd settings and installs the LED backend and two narrow sudo rules.', flush=True)
+    sys.path.insert(0, str(source / 'system'))
+    from keyboard_config import configure
+    config = Path('/etc/keyd/default.conf')
+    configure(config.read_text() if config.exists() else '')  # fail before build/elevation on ambiguous config
+    subprocess.run([str(source / 'system/build-keyd.sh')], check=True)
+    elevation = 'sudo' if sys.stdin.isatty() else 'pkexec'
+    subprocess.run([elevation, 'python3', str(source / 'system/install-system.py'),
+                    '--binary', str(source / '.build/keyd/bin/keyd'), '--plugin', str(source),
+                    '--user', getpass.getuser()], check=True)
 home = Path.home()
 target = home / '.config/omarchy/plugins/simondrey.agents-capslock'
 if source != target:
@@ -38,6 +59,12 @@ if alias.exists() or alias.is_symlink():
         shutil.copy2(alias, str(alias) + '.backup-' + str(time.time_ns()))
     alias.unlink()
 alias.symlink_to(target / 'bin/attention')
+led_cli = home / '.local/bin/caps-led'
+if led_cli.exists() or led_cli.is_symlink():
+    if not led_cli.is_symlink():
+        shutil.copy2(led_cli, str(led_cli) + '.backup-' + str(time.time_ns()))
+    led_cli.unlink()
+led_cli.symlink_to(target / 'bin/caps-led')
 units = home / '.config/systemd/user'
 units.mkdir(parents=True, exist_ok=True)
 (units / 'omarchy-attention.service').write_text(f'''[Unit]
