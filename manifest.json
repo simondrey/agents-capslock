@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "simondrey.attention",
+  "name": "Attention",
+  "version": "0.1.0",
+  "author": "simondrey",
+  "license": "MIT",
+  "description": "Calls for your attention, with direct return to the requesting tool.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "Main.qml"},
+  "barWidget": {
+    "displayName": "Attention",
+    "description": "Waiting tools and agents. Select a call to return to its window or pane.",
+    "category": "Productivity",
+    "defaultSection": "right",
+    "allowMultiple": false,
+    "defaults": {}
+  }
+}

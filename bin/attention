@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+import uuid
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from attention_lib.core import Queue, capture_target, clients, proc, run, window_for
+
+
+def parser():
+    p = argparse.ArgumentParser(description='Attention calls for Omarchy')
+    sub = p.add_subparsers(dest='command', required=True)
+    push = sub.add_parser('push', help='Create or replace a call')
+    push.add_argument('title'); push.add_argument('--id'); push.add_argument('--source', default='shell')
+    push.add_argument('--status', default='waiting'); push.add_argument('--pid', type=int)
+    push.add_argument('--ttl', type=float); push.add_argument('--window'); push.add_argument('--target')
+    push.add_argument('--metadata', default='{}')
+    sub.add_parser('list').add_argument('--json', action='store_true')
+    for name in ('remove', 'done', 'focus'):
+        sp = sub.add_parser(name); sp.add_argument('id'); sp.add_argument('--revision')
+    hb = sub.add_parser('heartbeat'); hb.add_argument('id'); hb.add_argument('--ttl', type=float, default=30)
+    sub.add_parser('daemon'); sub.add_parser('toggle'); sub.add_parser('doctor')
+    r = sub.add_parser('run', help='Capture routing context for an agent or tool')
+    r.add_argument('argv', nargs=argparse.REMAINDER)
+    h = sub.add_parser('hook', help='Receive agent lifecycle JSON on stdin')
+    h.add_argument('provider', choices=['codex', 'grok', 'cursor'])
+    return p
+
+
+
+def daemon(q):
+    lock = open(q.directory / 'daemon.lock', 'w')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise RuntimeError('The attention daemon is already running')
+    stopping = False
+    def stop(*_):
+        nonlocal stopping
+        stopping = True
+    signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
+    previous = None; led = False; warned = False
+    snapshot = q.directory / 'snapshot.json'
+    try:
+        while not stopping:
+            entries = q.list()
+            raw = json.dumps({'entries': entries}, ensure_ascii=False)
+            if raw != previous:
+                temp = q.directory / 'snapshot.tmp'
+                temp.write_text(raw + '\n'); temp.replace(snapshot)
+                previous = raw
+            desired = not led if entries else False
+            if desired != led:
+                try:
+                    p = subprocess.run(['/usr/bin/sudo', '-n', '/usr/local/libexec/caps-led', 'on' if desired else 'off'],
+                                       capture_output=True, text=True, timeout=2)
+                    if p.returncode:
+                        raise RuntimeError(p.stderr.strip())
+                    led = desired
+                except (OSError, RuntimeError, subprocess.TimeoutExpired) as e:
+                    if not warned:
+                        print('LED unavailable: ' + str(e), file=sys.stderr, flush=True); warned = True
+            time.sleep(.5)
+    finally:
+        subprocess.run(['/usr/bin/sudo', '-n', '/usr/local/libexec/caps-led', 'off'], capture_output=True, timeout=2)
+
+
+def main():
+    args = parser().parse_args()
+    if args.command == 'toggle':
+        print(run(['omarchy-shell', 'simondrey.attention', 'toggle'])); return
+    if args.command == 'run':
+        argv = args.argv[1:] if args.argv[:1] == ['--'] else args.argv
+        if not argv:
+            raise ValueError('Specify a tool after attention run --')
+        env = os.environ.copy()
+        env['ATTENTION_TARGET'] = json.dumps(capture_target(os.getppid()))
+        env['ATTENTION_OWNER_PID'] = str(os.getpid())
+        env['ATTENTION_SESSION'] = str(uuid.uuid4())
+        # exec preserves PID, controlling terminal, signals, and exit status.
+        os.execvpe(argv[0], argv, env)
+    q = Queue()
+    if args.command == 'push':
+        pid = args.pid or int(os.environ.get('ATTENTION_OWNER_PID', os.getppid()))
+        if args.target:
+            target = json.loads(args.target)
+        elif args.window:
+            win = next((w for w in clients() if w['address'] == args.window), None)
+            if not win: raise ValueError('Window does not exist')
+            target = {'kind': 'window', 'address': args.window, 'window_owner': proc(win['pid'])}
+        else:
+            target = capture_target(pid)
+        print(q.push(args.title, pid, target, args.id, args.source, args.status, args.ttl, json.loads(args.metadata))['id'])
+    elif args.command == 'list':
+        entries = q.list()
+        print(json.dumps(entries, ensure_ascii=False) if args.json else '\n'.join(f"{e['id']}\t{e['source']}\t{e['title']}" for e in entries))
+    elif args.command in ('remove', 'done'): q.remove(args.id, args.revision)
+    elif args.command == 'focus': q.activate(args.id, args.revision)
+    elif args.command == 'heartbeat': q.heartbeat(args.id, args.ttl)
+    elif args.command == 'daemon': daemon(q)
+    elif args.command == 'hook':
+        from attention_lib.hooks import handle
+        handle(q, args.provider, json.load(sys.stdin))
+    elif args.command == 'doctor':
+        print('Queue:', q.directory)
+        for cmd in (['systemctl', '--user', 'is-active', 'omarchy-attention'], ['systemctl', 'is-active', 'keyd']):
+            p = subprocess.run(cmd, text=True, capture_output=True)
+            print(' '.join(cmd) + ': ' + (p.stdout.strip() or p.stderr.strip()))
+        print('Active calls:', len(q.list()))
+
+if __name__ == '__main__':
+    os.umask(0o077)
+    try:
+        main()
+    except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as e:
+        print('attention: ' + str(e), file=sys.stderr)
+        # Hook transport failures must never prevent an agent's operation.
+        sys.exit(0 if 'hook' in sys.argv[1:2] else 1)

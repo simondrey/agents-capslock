@@ -1,0 +1,27 @@
+#!/usr/bin/python3 -I
+"""LED-only root helper for keyd 2.6.0 with attention-led.patch."""
+import socket
+import struct
+import sys
+if len(sys.argv) != 2 or sys.argv[1] not in ('on', 'off'):
+    sys.exit('Usage: caps-led on|off')
+value = ('attention-led:' + sys.argv[1]).encode()
+# Native ABI of keyd's struct ipc_message; intentionally pinned to 2.6.0.
+packet = struct.pack('@II4096sN', 2, 0, value, len(value))
+try:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+        conn.settimeout(2)
+        conn.connect('/var/run/keyd.socket')
+        conn.sendall(packet)
+        response = b''
+        while len(response) < len(packet):
+            chunk = conn.recv(len(packet) - len(response))
+            if not chunk: break
+            response += chunk
+    if len(response) != len(packet):
+        raise RuntimeError('Incomplete response from keyd')
+    kind, _, message, _ = struct.unpack('@II4096sN', response)
+    if kind != 0:
+        raise RuntimeError(message.split(b'\0')[0].decode(errors='replace'))
+except (OSError, RuntimeError) as e:
+    sys.exit('caps-led: ' + str(e))

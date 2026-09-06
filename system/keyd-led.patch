@@ -1,0 +1,59 @@
+diff --git i/src/daemon.c w/src/daemon.c
+index c70fbab..4463ebe 100644
+--- i/src/daemon.c
++++ w/src/daemon.c
+@@ -15,6 +15,8 @@ static uint8_t keystate[256];
+ static int listeners[32];
+ static size_t nr_listeners = 0;
+ static struct keyboard *active_kbd = NULL;
++/* Optional attention LED override; -1 delegates to the compositor. */
++static int attention_led = -1;
+ 
+ static void free_configs(void)
+ {
+@@ -157,7 +159,7 @@ static void on_layer_change(const struct keyboard *kbd, const struct layer *laye
+ 
+ 		for (i = 0; i < device_table_sz; i++)
+ 			if (device_table[i].data == kbd)
+-				device_set_led(&device_table[i], 1, active_layers);
++				device_set_led(&device_table[i], 1, attention_led >= 0 ? attention_led : active_layers);
+ 	}
+ 
+ 	if (!nr_listeners)
+@@ -285,6 +287,7 @@ static void manage_device(struct device *dev)
+ 			  dev->id, ent->config.path, dev->name);
+ 
+ 		dev->data = ent->kbd;
++        if (attention_led >= 0) device_set_led(dev, 1, attention_led);
+ 	} else {
+ 		dev->data = NULL;
+ 		device_ungrab(dev);
+@@ -446,6 +449,18 @@ static void handle_client(int con)
+ 		add_listener(con);
+ 		break;
+ 	case IPC_BIND:
++        /* Narrow extension: no input injection, only the CapsLock indicator. */
++        if (!strcmp(msg.data, "attention-led:on") ||
++            !strcmp(msg.data, "attention-led:off") ||
++            !strcmp(msg.data, "attention-led:auto")) {
++            attention_led = !strcmp(msg.data, "attention-led:on") ? 1 :
++                            !strcmp(msg.data, "attention-led:off") ? 0 : -1;
++            for (size_t i = 0; i < device_table_sz; i++)
++                if (device_table[i].data)
++                    device_set_led(&device_table[i], 1, attention_led > 0);
++            send_success(con);
++            break;
++        }
+ 		success = 0;
+ 
+ 		if (msg.sz == sizeof(msg.data)) {
+@@ -580,7 +595,8 @@ static int event_handler(struct event *ev)
+ 			 */
+ 			for (i = 0; i < device_table_sz; i++)
+ 				if (device_table[i].data)
+-					device_set_led(&device_table[i], ev->devev->code, ev->devev->pressed);
++					device_set_led(&device_table[i], ev->devev->code,
++                        ev->devev->code == 1 && attention_led >= 0 ? attention_led : ev->devev->pressed);
+ 		}
+ 
+ 		break;
