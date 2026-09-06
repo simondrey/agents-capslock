@@ -1,6 +1,7 @@
 """Passive adapters. They never approve, reject, or resume an agent."""
 import os
 from .core import capture_target
+from .agent import context, question_id
 
 CLEAR = {'SessionEnd', 'SessionStart', 'UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure',
          'Interrupt', 'Stop', 'StopFailure', 'StopCancelled', 'sessionStart', 'sessionEnd',
@@ -18,6 +19,9 @@ def handle(q, provider, data):
         event = ''.join(w.title() for w in str(data.get('hookEventName') or os.environ.get('GROK_HOOK_EVENT', '')).split('_'))
     turn = data.get('turn_id') or data.get('promptId')
     if event in CLEAR:
+        # A question intentionally survives Stop: ending a turn can mean waiting for a reply.
+        if provider == 'codex' and event in ('SessionStart', 'SessionEnd', 'UserPromptSubmit'):
+            q.remove(question_id(session))
         existing = next((e for e in q.list() if e['id'] == ident), None)
         if existing:
             # Delayed completion for an older turn must not erase a newer call.
@@ -31,9 +35,12 @@ def handle(q, provider, data):
             return
         owner = int(os.environ.get('ATTENTION_OWNER_PID', '0'))
         if not owner:
-            raise ValueError('Launch with attention run to capture lifetime and return target')
+            identity, target = context(provider)
+            owner = identity['pid']
+        else:
+            target = capture_target(owner)
         tool_input = data.get('tool_input') or data.get('toolInput') or {}
         description = tool_input.get('description') if isinstance(tool_input, dict) else None
         title = data.get('message') or description or 'Approval or answer required'
-        q.push(str(title)[:1000], owner, capture_target(owner), ident, provider, 'waiting',
+        q.push(str(title)[:1000], owner, target, ident, provider, 'waiting',
                metadata={'session_id': session, 'turn_id': turn, 'event': event})

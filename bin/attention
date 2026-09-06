@@ -15,7 +15,7 @@ from attention_lib.core import Queue, capture_target, clients, proc, run, window
 
 
 def parser():
-    p = argparse.ArgumentParser(description='Attention calls for Omarchy')
+    p = argparse.ArgumentParser(description='Agents CapsLock — attention calls for Omarchy')
     sub = p.add_subparsers(dest='command', required=True)
     push = sub.add_parser('push', help='Create or replace a call')
     push.add_argument('title'); push.add_argument('--id'); push.add_argument('--source', default='shell')
@@ -26,6 +26,7 @@ def parser():
     for name in ('remove', 'done', 'focus'):
         sp = sub.add_parser(name); sp.add_argument('id'); sp.add_argument('--revision')
     hb = sub.add_parser('heartbeat'); hb.add_argument('id'); hb.add_argument('--ttl', type=float, default=30)
+    sub.add_parser('agent-status')
     sub.add_parser('daemon'); sub.add_parser('toggle'); sub.add_parser('doctor')
     r = sub.add_parser('run', help='Capture routing context for an agent or tool')
     r.add_argument('argv', nargs=argparse.REMAINDER)
@@ -75,7 +76,7 @@ def daemon(q):
 def main():
     args = parser().parse_args()
     if args.command == 'toggle':
-        print(run(['omarchy-shell', 'simondrey.attention', 'toggle'])); return
+        print(run(['omarchy-shell', 'simondrey.agents-capslock', 'toggle'])); return
     if args.command == 'run':
         argv = args.argv[1:] if args.argv[:1] == ['--'] else args.argv
         if not argv:
@@ -86,6 +87,10 @@ def main():
         env['ATTENTION_SESSION'] = str(uuid.uuid4())
         # exec preserves PID, controlling terminal, signals, and exit status.
         os.execvpe(argv[0], argv, env)
+    if args.command == 'agent-status':
+        from attention_lib.agent import context
+        owner, target = context()
+        print(json.dumps({'owner': owner, 'target': target})); return
     q = Queue()
     if args.command == 'push':
         pid = args.pid or int(os.environ.get('ATTENTION_OWNER_PID', os.getppid()))

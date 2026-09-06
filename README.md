@@ -1,8 +1,8 @@
-# Attention for Omarchy
+# Agents CapsLock
 
 A native Omarchy bar plugin for tools that need a human response. Calls are shown newest first. Selecting a call returns to its window or pane and acknowledges it only after successful routing. Calls disappear when their owner exits. CapsLock blinks while calls remain.
 
-**Private preview, 0.1.0.** This is an independent plugin by simondrey, not an official Omarchy component. No public publication or upstream submission has been made.
+**Private preview, 0.2.0.** This is an independent plugin by simondrey, not an official Omarchy component. No public publication or upstream submission has been made.
 
 ## On this machine
 
@@ -26,7 +26,7 @@ attention done "$call_id"
 trap - EXIT
 ```
 
-`--pid` is the **author**, not the short-lived `attention` command. Without it, Attention uses the `attention run` owner or its parent process. A PID is matched with its Linux process start time and boot ID, so PID reuse cannot resurrect a call. Cleanup runs every 500 ms. Exited zombies are treated as dead.
+`--pid` is the **author**, not the short-lived `attention` command. Without it, Agents CapsLock uses the `attention run` owner or its parent process. A PID is matched with its Linux process start time and boot ID, so PID reuse cannot resurrect a call. Cleanup runs every 500 ms. Exited zombies are treated as dead.
 
 Use a stable `--id deploy:staging` to update one call instead of appending duplicates. `attention list --json` provides structured records; `attention done ID` removes a completed/cancelled request. Selecting a call only changes focus: it never approves the request or sends an answer.
 
@@ -68,10 +68,18 @@ Custom applications can provide `{"kind":"command","argv":["my-tool","focus","se
 
 ## Agent integrations
 
-Optional installation preserves existing hook definitions and creates backups:
+For persistent Codex CLI integration (questions through MCP plus native approval hooks):
 
 ```bash
-python3 integrations/install-hooks.py codex grok
+python3 integrations/connect-codex.py
+```
+
+Restart Codex and review the new hooks with `/hooks`. See [Connecting your agent](docs/connecting-agents.md) for the complete contract, configuration, restart behavior and troubleshooting. Both `agents-capslock` and the compatible `attention` command work.
+
+For other agents, optional hook installation preserves existing definitions and creates backups:
+
+```bash
+python3 integrations/install-hooks.py grok
 # Cursor lifecycle cleanup, if wanted:
 python3 integrations/install-hooks.py cursor
 ```
@@ -80,7 +88,7 @@ Restart the CLI after installing hooks and launch it through `attention run`. Co
 
 | Tool | Adapter in this preview | Limits |
 |---|---|---|
-| Codex CLI | `PermissionRequest` creates a call; tool completion, next prompt, stop/interrupt/session end clear it | Arbitrary conversational questions have no automatic adapter here; shared app-server hooks must inherit or explicitly receive the originating context |
+| Codex CLI | Persistent MCP tools and global instructions signal conversational questions; trusted hooks observe approvals and clean up lifecycle events | Instructions require agent cooperation; native hooks require trust; shared app-server sessions need explicit return context |
 | Official Grok CLI (`@xai-official/grok`) | `Notification` permission/elicitation events create calls; lifecycle events clear them; camelCase fields supported | No completed-task/idle spam; one active call per session; hook context must propagate |
 | Cursor CLI | Lifecycle hooks clear explicitly created calls | Documented hooks do not expose every approval/question wait; automatic wait detection is **not claimed** |
 | tmux | Automatic pane/socket capture and exact focus | Not a universal detector of programs waiting for input |
@@ -95,12 +103,12 @@ Source contracts: [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Grok hoo
 Requires an Omarchy release using the Quickshell plugin system and Hyprland Lua dispatch, Python 3, systemd and keyd 2.6.0 for the optional LED backend. tmux and Herdr are optional.
 
 ```bash
-git clone git@github.com:simondrey/omarchy-attention.git
-cd omarchy-attention
+git clone git@github.com:simondrey/agents-capslock.git
+cd agents-capslock
 python3 install.py
 ```
 
-The installer copies the plugin to `~/.config/omarchy/plugins/simondrey.attention`, installs the CLI and user service, and adds F24 to the user's Hyprland bindings. Review existing F24 bindings first if installing on another machine. Updates can be applied by rerunning the installer; the daemon is restarted to load Python changes.
+The installer migrates the old `simondrey.attention` bar entry in place and archives the old plugin outside the plugin directory. It copies the plugin to `~/.config/omarchy/plugins/simondrey.agents-capslock`, installs the CLI and user service, and adds F24 to the user's Hyprland bindings. Review existing F24 bindings first if installing on another machine. Updates can be applied by rerunning the installer; the daemon is restarted to load Python changes.
 
 The native `manifest.json` also supports `omarchy plugin add` once the repository becomes accessible. The user-service/CLI setup still needs `install.py`.
 

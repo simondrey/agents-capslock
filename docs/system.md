@@ -32,7 +32,7 @@ The installer selects `/usr/local/libexec/keyd-attention` through `/etc/systemd/
 
 ```bash
 systemctl --user disable --now omarchy-attention
-omarchy plugin disable simondrey.attention
+omarchy plugin disable simondrey.agents-capslock
 ```
 
 Stopping the service turns the LED off. Remove the marked two-line `omarchy-attention` block from `~/.config/hypr/bindings.lua` to release F24, then run `hyprctl reload` and `hyprctl configerrors`.

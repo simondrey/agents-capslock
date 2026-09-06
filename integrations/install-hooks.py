@@ -10,7 +10,7 @@ p=argparse.ArgumentParser()
 p.add_argument('providers', nargs='+', choices=['codex','grok','cursor'])
 args=p.parse_args()
 cli=Path.home()/'.local/bin/attention'
-if not cli.exists(): p.error('Install Attention first')
+if not cli.exists(): p.error('Install Agents CapsLock first')
 for provider in args.providers:
     path=Path.home()/({'codex':'.codex/hooks.json','grok':'.grok/hooks/attention.json','cursor':'.cursor/hooks.json'}[provider])
     config=json.loads(path.read_text()) if path.exists() else {}

@@ -20,14 +20,14 @@ try:
     entry = q.push('Test: this terminal needs your attention', terminal.pid,
                    {'kind': 'window', 'address': win['address'], 'window_owner': proc(win['pid'])}, ident, 'Integration test')
     time.sleep(.7)
-    run(['omarchy-shell', 'simondrey.attention', 'open']); time.sleep(.6)
+    run(['omarchy-shell', 'simondrey.agents-capslock', 'open']); time.sleep(.6)
     subprocess.run(['grim', '/tmp/attention-populated.png'], check=True)
     readings=[]
     for _ in range(14):
         readings.append(Path('/sys/class/leds/input3::capslock/brightness').read_text().strip())
         time.sleep(.1)
     assert set(readings) == {'0','1'}, readings
-    run(['omarchy-shell', 'simondrey.attention', 'activate'])
+    run(['omarchy-shell', 'simondrey.agents-capslock', 'activate'])
     for _ in range(40):
         if not any(e['id']==ident for e in q.list()): break
         time.sleep(.1)
@@ -43,4 +43,4 @@ finally:
     q.remove(ident)
     if terminal.poll() is None:
         terminal.terminate(); terminal.wait(timeout=5)
-    run(['omarchy-shell','simondrey.attention','close'])
+    run(['omarchy-shell','simondrey.agents-capslock','close'])

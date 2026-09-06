@@ -7,8 +7,8 @@ import qs.Ui
 
 Panel {
     id: root
-    moduleName: "simondrey.attention"
-    ipcTarget: "simondrey.attention"
+    moduleName: "simondrey.agents-capslock"
+    ipcTarget: "simondrey.agents-capslock"
     manageIpc: false
     IpcHandler {
         target: root.ipcTarget
@@ -93,7 +93,7 @@ Panel {
                 anchors.fill: parent
                 spacing: Style.space(12)
                 Text {
-                    text: "Attention"; color: Color.foreground
+                    text: "Agents CapsLock"; color: Color.foreground
                     font.family: Style.font.family; font.pixelSize: Style.space(22); font.bold: true
                 }
                 Text {
